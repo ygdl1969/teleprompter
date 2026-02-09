@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>v85.0 输入法接管版</title>
+    <title>v87.0 声波驱动版</title>
     <style>
         body {
             background-color: #000;
@@ -16,18 +16,16 @@
 
         /* 顶部状态栏 */
         #status-bar {
-            position: fixed; top: 0; left: 0; width: 100%; height: 40px;
+            position: fixed; top: 0; left: 0; width: 100%; height: 30px;
             background: #111; border-bottom: 1px solid #333;
             display: flex; align-items: center; justify-content: center;
-            font-size: 14px; color: #888; z-index: 100;
+            font-size: 12px; color: #888; z-index: 100;
         }
-        .status-ready { color: #00E5FF !important; font-weight: bold; }
-
+        
         /* 滚动容器 */
         #scroll-container {
-            position: absolute; top: 40px; left: 0; width: 100%; 
-            /* 留出底部空间给键盘 */
-            height: calc(100% - 100px); 
+            position: absolute; top: 30px; left: 0; width: 100%; 
+            height: calc(100% - 130px); /* 留出底部控制区 */
             overflow-y: scroll;
             scroll-behavior: auto; 
         }
@@ -36,246 +34,262 @@
         #content {
             padding: 40vh 5% 800px 5%;
             width: 90%;
-            font-size: 50px; /* 手机适中字号 */
+            font-size: 55px; 
             line-height: 1.6; 
             text-align: center;
         }
         
         .mirror-on { transform: scaleX(-1); }
 
-        .word {
-            display: inline-block;
-            color: #444; 
-            margin: 0 2px;
-            transition: color 0.3s; 
+        /* 底部控制区 */
+        #bottom-panel {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 100px;
+            background: #1a1a1a; border-top: 1px solid #333;
+            display: flex; flex-direction: column; justify-content: space-evenly;
+            z-index: 999; padding: 5px 15px; box-sizing: border-box;
         }
 
-        .active-word {
-            color: #fff;
-            text-shadow: 0 0 20px #00E5FF;
-            transform: scale(1.15);
-            font-weight: bold;
+        /* 滑块行 */
+        .slider-row {
+            display: flex; align-items: center; justify-content: space-between;
+            width: 100%; color: #aaa; font-size: 12px;
         }
-        
-        .passed-word { color: #222; }
+        .slider-row label { width: 40px; }
+        .slider-row input { flex: 1; margin: 0 10px; }
+        .slider-val { width: 30px; text-align: right; color: #fff; }
 
-        /* ★★★ 隐形输入触发区 ★★★ */
-        #input-trigger {
-            position: fixed; bottom: 0; left: 0; width: 100%; height: 60px;
-            background: #222; border-top: 1px solid #444;
-            display: flex; align-items: center; justify-content: center;
-            z-index: 999;
+        /* 启动按钮 */
+        #btn-start {
+            width: 100%; height: 35px;
+            background: #0078d7; color: white; border: none; border-radius: 4px;
+            font-weight: bold; font-size: 14px;
+            margin-top: 5px;
         }
-        
-        #hidden-input {
-            width: 90%; height: 40px;
-            background: #333; color: #fff;
-            border: 1px solid #555; border-radius: 20px;
-            padding: 0 15px; font-size: 16px;
-            outline: none; text-align: center;
-        }
-        #hidden-input::placeholder { color: #888; }
+        .running #btn-start { background: #d9534f; }
 
-        /* 控制栏 (悬浮在输入框上方) */
-        #controls {
-            position: fixed; bottom: 70px; right: 10px;
-            display: flex; flex-direction: column; gap: 10px;
-            z-index: 998;
+        /* 音量条可视化 */
+        #vol-meter {
+            position: absolute; bottom: 100px; left: 0; width: 100%; height: 4px;
+            background: #333;
+        }
+        #vol-bar {
+            width: 0%; height: 100%; background: #00E5FF;
+            transition: width 0.1s;
         }
 
+        /* 侧边悬浮按钮 */
+        #side-controls {
+            position: fixed; bottom: 110px; right: 10px;
+            display: flex; flex-direction: column; gap: 8px; z-index: 998;
+        }
         .mini-btn {
-            width: 40px; height: 40px; border-radius: 50%;
+            width: 36px; height: 36px; border-radius: 50%;
             background: rgba(50,50,50,0.8); border: 1px solid #666;
-            color: #fff; font-size: 12px; font-weight: bold;
+            color: #fff; font-size: 10px; font-weight: bold;
             display: flex; align-items: center; justify-content: center;
-            cursor: pointer;
         }
-        .mini-btn:active { background: #0078d7; }
 
         /* 编辑器 */
         #editor-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 10000; flex-direction: column;
         }
-        .editor-header {
-            height: 50px; background: #111; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; border-bottom: 1px solid #333;
-        }
         #editor-text {
-            flex: 1; width: 100%; background: #111; color: #fff; border: none; padding: 15px; font-size: 18px; line-height: 1.5; resize: none; outline: none;
+            flex: 1; width: 100%; background: #111; color: #fff; border: none; padding: 15px; font-size: 18px;
+        }
+        .editor-header {
+             height: 40px; background: #222; display: flex; justify-content: space-between; align-items: center; padding: 0 10px;
         }
     </style>
 </head>
 <body>
 
-    <div id="status-bar" class="status-ready">v85.0 输入法接管版 (请点下方输入框)</div>
+    <div id="status-bar">v87.0 声波驱动版 (请点击蓝色按钮启动)</div>
     
+    <div id="vol-meter"><div id="vol-bar"></div></div>
+
     <div id="scroll-container">
         <div id="content"></div>
     </div>
 
-    <div id="controls">
-        <button class="mini-btn" onclick="openEditor()">换稿</button>
-        <button class="mini-btn" onclick="toggleMirror()">镜像</button>
-        <button class="mini-btn" onclick="changeFontSize(5)">A+</button>
-        <button class="mini-btn" onclick="changeFontSize(-5)">A-</button>
-        <button class="mini-btn" onclick="reset()">重置</button>
+    <div id="side-controls">
+        <button class="mini-btn" onclick="openEditor()">稿</button>
+        <button class="mini-btn" onclick="toggleMirror()">镜</button>
+        <button class="mini-btn" onclick="changeFontSize(5)">+</button>
+        <button class="mini-btn" onclick="changeFontSize(-5)">-</button>
+        <button class="mini-btn" onclick="reset()">重</button>
     </div>
 
-    <div id="input-trigger">
-        <input type="text" id="hidden-input" placeholder="点击此处 -> 开启键盘语音" autocomplete="off">
+    <div id="bottom-panel">
+        <div class="slider-row">
+            <label>速度</label>
+            <input type="range" id="speed-slider" min="0.5" max="5.0" step="0.1" value="1.5" oninput="updateSpeed(this.value)">
+            <span id="speed-val" class="slider-val">1.5</span>
+        </div>
+        <div class="slider-row">
+            <label>灵敏</label>
+            <input type="range" id="sens-slider" min="1" max="50" step="1" value="15" oninput="updateSens(this.value)">
+            <span id="sens-val" class="slider-val">15</span>
+        </div>
+        <button id="btn-start" onclick="toggleAudio()">启动声控引擎</button>
     </div>
 
     <div id="editor-overlay">
         <div class="editor-header">
-            <button onclick="closeEditor()" style="background:#d9534f;color:white;border:none;padding:5px 15px;border-radius:4px;">取消</button>
-            <span style="color:#fff;">编辑文稿</span>
-            <button onclick="saveEditor()" style="background:#0078d7;color:white;border:none;padding:5px 15px;border-radius:4px;">完成</button>
+            <button onclick="closeEditor()" style="color:#fff;background:none;border:none;">取消</button>
+            <span style="color:#888;">编辑文稿</span>
+            <button onclick="saveEditor()" style="color:#00E5FF;background:none;border:none;">完成</button>
         </div>
         <textarea id="editor-text"></textarea>
     </div>
 
     <script>
-        var rawText = `这是v85输入法接管版。
-解决国内安卓Chrome无法识别的问题。
+        var rawText = `这是v87声波驱动版。
+解决国内安卓无法实时识别的痛点。
+工作原理：
+它不再“听”你说的是什么字，
+而是“感知”你有没有在说话。
 使用方法：
-1. 点击底部的输入框。
-2. 手机键盘弹出后，点击键盘上的“麦克风”图标。
-3. 对着输入法说话。
-4. 输入法上屏的字，会立刻驱动提词器滚动。
-此方案利用了搜狗/百度/讯飞的强大识别能力。
-识别准、速度快、无视网络限制。
-请尽情尝试。`;
+1. 点击下方【启动声控引擎】。
+2. 允许麦克风权限 (必须HTTPS)。
+3. 对着手机说话。
+4. 有声音 -> 文字滚动。
+5. 没声音 -> 文字停止。
+调节技巧：
+- 如果周围环境吵，把【灵敏】调高(数值变大)。
+- 如果滚得太慢，把【速度】调高。
+彻底告别输入法的卡顿。`;
 
-        var words = [];
-        var currIdx = 0;
-        var container = document.getElementById('scroll-container');
+        // 核心参数
+        var isRunning = false;
+        var audioContext = null;
+        var analyser = null;
+        var microphone = null;
+        var scriptProcessor = null;
         
-        // v69 物理参数
-        var currentSpeed = 0;    
-        var minSpeed = 0.5;      
-        var cruiseSpeed = 1.5;   
-        var rafId = null;
-        var isRunning = true; // 默认开启物理引擎
+        // 运动参数
+        var baseSpeed = 1.5;
+        var sensitivity = 15; // 阈值，越小越灵敏
+        var currentScrollSpeed = 0;
+        var container = document.getElementById('scroll-container');
 
-        function init() { render(); startFlowEngine(); setupInputListener(); }
+        function init() { render(); }
 
         function render() {
-            var html = "";
-            var idx = 0;
-            for (let char of rawText) {
-                if (char === '\n') html += '<br>';
-                else if (char.trim() !== '') {
-                    html += `<span class="word" id="w-${idx}">${char}</span>`;
-                    idx++;
-                }
-            }
-            document.getElementById('content').innerHTML = html;
-            words = document.querySelectorAll('.word');
-            currIdx = 0;
+            // 简单渲染，不需要拆词了，因为是纯滚动
+            document.getElementById('content').innerHTML = rawText.replace(/\n/g, '<br>');
         }
 
-        // ★★★ 核心：监听输入框 ★★★
-        function setupInputListener() {
-            var input = document.getElementById('hidden-input');
+        // ★★★ 核心：Web Audio API 声波检测 ★★★
+        async function toggleAudio() {
+            if (isRunning) {
+                stopAudio();
+            } else {
+                await startAudio();
+            }
+        }
+
+        async function startAudio() {
+            try {
+                // 1. 获取麦克风 (仅获取音量流，不需要 Google 服务)
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                
+                // 2. 创建音频上下文
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                microphone = audioContext.createMediaStreamSource(stream);
+                scriptProcessor = audioContext.createScriptProcessor(2048, 1, 1);
+
+                // 3. 连接节点
+                analyser.smoothingTimeConstant = 0.8;
+                analyser.fftSize = 1024;
+                microphone.connect(analyser);
+                analyser.connect(scriptProcessor);
+                scriptProcessor.connect(audioContext.destination);
+
+                // 4. 监听音量
+                scriptProcessor.onaudioprocess = function() {
+                    const array = new Uint8Array(analyser.frequencyBinCount);
+                    analyser.getByteFrequencyData(array);
+                    
+                    // 计算平均音量
+                    let values = 0;
+                    const length = array.length;
+                    for (let i = 0; i < length; i++) {
+                        values += array[i];
+                    }
+                    const average = values / length;
+
+                    // 更新可视化条
+                    document.getElementById('vol-bar').style.width = (average * 2) + "%";
+
+                    // ★★★ 核心逻辑：有声音就走，没声音就停 ★★★
+                    if (average > sensitivity) {
+                        // 声音够大，全速前进
+                        targetSpeed = baseSpeed;
+                        document.getElementById('status-bar').style.color = "#00E5FF";
+                        document.getElementById('status-bar').innerText = "🔊 检测到语音 - 滚动中...";
+                    } else {
+                        // 没声音，慢慢停下
+                        targetSpeed = 0;
+                        document.getElementById('status-bar').style.color = "#888";
+                        document.getElementById('status-bar').innerText = "💤 等待语音...";
+                    }
+
+                    // 平滑过渡
+                    currentScrollSpeed += (targetSpeed - currentScrollSpeed) * 0.1;
+                    
+                    // 执行滚动
+                    if (currentScrollSpeed > 0.1) {
+                        container.scrollTop += currentScrollSpeed;
+                    }
+                };
+
+                // UI 更新
+                isRunning = true;
+                document.getElementById('btn-start').innerText = "🛑 停止引擎";
+                document.getElementById('bottom-panel').classList.add('running');
+                
+                // 保持屏幕常亮 (简单的视频循环黑魔法)
+                enableNoSleep();
+
+            } catch (e) {
+                alert("无法启动麦克风！\n1. 请确保是 HTTPS 链接 (GitHub Pages)。\n2. 请在弹窗中允许麦克风权限。\n错误信息: " + e);
+            }
+        }
+
+        function stopAudio() {
+            if (audioContext) audioContext.close();
+            if (microphone) microphone.disconnect();
+            if (scriptProcessor) scriptProcessor.disconnect();
             
-            // 监听输入事件
-            input.addEventListener('input', function(e) {
-                var text = e.target.value;
-                if (text.length > 0) {
-                    smartMatch(text);
-                    // 匹配后清空，防止文字堆积
-                    // 为了保证连贯性，我们只保留最后两个字作为“尾巴”
-                    if (text.length > 10) {
-                        e.target.value = text.slice(-2); 
-                    }
-                }
-            });
-
-            // 聚焦时提示
-            input.addEventListener('focus', function() {
-                document.getElementById('status-bar').innerText = "🎤 请使用键盘语音输入...";
-                document.getElementById('status-bar').style.color = "#00E5FF";
-            });
+            isRunning = false;
+            document.getElementById('btn-start').innerText = "启动声控引擎";
+            document.getElementById('bottom-panel').classList.remove('running');
+            document.getElementById('status-bar').innerText = "已停止";
+            document.getElementById('vol-bar').style.width = "0%";
         }
 
-        // --- 智能防跳 (v69) ---
-        function smartMatch(transcript) {
-            var clean = transcript.replace(/[^\u4e00-\u9fa50-9a-zA-Z]/g, "");
-            if (clean.length < 1) return;
-
-            var foundOffset = -1;
-            
-            if (clean.length >= 2) {
-                var key2 = clean.slice(-2);
-                var searchWide = 50;
-                for (let offset = 0; offset < searchWide; offset++) {
-                    if (!words[currIdx + offset] || !words[currIdx + offset + 1]) break;
-                    var char1 = words[currIdx + offset].innerText;
-                    var char2 = words[currIdx + offset + 1].innerText;
-                    if ((char1 + char2) === key2) {
-                        foundOffset = offset + 1;
-                        break; 
-                    }
-                }
-            }
-
-            if (foundOffset === -1) {
-                var key1 = clean.slice(-1);
-                var searchNarrow = 8; 
-                for (let offset = 0; offset < searchNarrow; offset++) {
-                    if (!words[currIdx + offset]) break;
-                    if (words[currIdx + offset].innerText === key1) {
-                        foundOffset = offset;
-                        break; 
-                    }
-                }
-            }
-
-            if (foundOffset !== -1) {
-                var newIdx = currIdx + foundOffset;
-                for (let i = currIdx; i <= newIdx; i++) {
-                     if(words[i]) {
-                         words[i].className = (i < newIdx) ? "word passed-word" : "word active-word";
-                     }
-                }
-                currIdx = newIdx;
-            }
+        // --- 防锁屏黑魔法 ---
+        function enableNoSleep() {
+            // 创建一个微小的循环播放视频，欺骗安卓系统不锁屏
+            let video = document.createElement('video');
+            video.setAttribute('playsinline', '');
+            video.setAttribute('src', 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMQAAAAhmcmVlAAAAG21kYXQAAAGzABAHAAABthADAQBAAAABAAAABgd1ZGl0YW1sPAAAAAA=');
+            video.style.display = 'none';
+            document.body.appendChild(video);
+            video.play().catch(()=>{});
         }
 
-        // --- 流速引擎 (v69) ---
-        function startFlowEngine() {
-            function loop() {
-                var activeEl = words[currIdx];
-                var targetSpeed = 0;
-
-                if (activeEl) {
-                    var relativeY = activeEl.getBoundingClientRect().top;
-                    var viewportH = window.innerHeight;
-                    // v85 修正：考虑到键盘弹起，视口变小，调整触发区
-                    // 我们希望字在屏幕上方 1/3 处
-                    var ratio = relativeY / viewportH;
-
-                    if (ratio > 0.40) { 
-                        targetSpeed = cruiseSpeed + ((ratio - 0.40) * 15); 
-                        if(targetSpeed > 15) targetSpeed = 15;
-                    } 
-                    else if (ratio < 0.20) { 
-                        targetSpeed = minSpeed;
-                        if (ratio < 0.10) targetSpeed = 0; 
-                    } 
-                    else { 
-                        targetSpeed = cruiseSpeed;
-                    }
-                }
-
-                currentSpeed += (targetSpeed - currentSpeed) * 0.05;
-                container.scrollTop += currentSpeed;
-                rafId = requestAnimationFrame(loop);
-            }
-            loop();
+        // --- UI Helper ---
+        function updateSpeed(val) {
+            baseSpeed = parseFloat(val);
+            document.getElementById('speed-val').innerText = baseSpeed.toFixed(1);
         }
-
-        // UI Helpers
+        function updateSens(val) {
+            sensitivity = parseInt(val);
+            document.getElementById('sens-val').innerText = val;
+        }
         function changeFontSize(d) {
             var el = document.getElementById('content');
             var s = parseInt(window.getComputedStyle(el).fontSize);
@@ -286,12 +300,9 @@
         function closeEditor() { document.getElementById('editor-overlay').style.display = 'none'; }
         function saveEditor() { 
             var val = document.getElementById('editor-text').value; 
-            if (val) { rawText = val; render(); reset(); closeEditor(); } 
+            if (val) { rawText = val; render(); closeEditor(); } 
         }
-        function reset() { 
-            currIdx = 0; render(); container.scrollTop = 0; currentSpeed = minSpeed; 
-            document.getElementById('hidden-input').value = "";
-        }
+        function reset() { container.scrollTop = 0; }
 
         init();
     </script>
