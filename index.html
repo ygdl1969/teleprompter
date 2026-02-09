@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>v84.0 安卓适配版 (v69内核)</title>
+    <style>
+        /* 基础样式 */
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: "Microsoft YaHei", sans-serif;
+            margin: 0; padding: 0;
+            height: 100vh; overflow: hidden;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent; /* 安卓去除点击高光 */
+        }
+
+        /* 顶部状态栏 */
+        #status-bar {
+            position: fixed; top: 0; left: 0; width: 100%; height: 40px;
+            background: #111; border-bottom: 1px solid #333;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; color: #888; z-index: 100;
+        }
+        .status-wait { color: #FFA500 !important; font-weight: bold; }
+        .status-running { color: #00E5FF !important; font-weight: bold; }
+        .status-error { color: #ff4444 !important; font-weight: bold; }
+
+        /* 滚动容器 */
+        #scroll-container {
+            position: absolute; top: 40px; left: 0; width: 100%; height: calc(100% - 110px);
+            overflow-y: scroll;
+            scroll-behavior: auto; 
+        }
+        #scroll-container::-webkit-scrollbar { display: none; }
+
+        /* 内容区域 - 手机端字号适配 */
+        #content {
+            padding: 40vh 5% 800px 5%;
+            width: 90%;
+            font-size: 60px; /* 手机默认字号稍微调小一点点适配屏幕 */
+            line-height: 1.6; 
+            text-align: center;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        
+        .mirror-on { transform: scaleX(-1); }
+
+        /* 文字样式 (v69) */
+        .word {
+            display: inline-block;
+            color: #444; 
+            margin: 0 2px;
+            transition: color 0.5s; 
+        }
+
+        .active-word {
+            color: #fff;
+            text-shadow: 0 0 20px #00E5FF;
+            transform: scale(1.1);
+            font-weight: bold;
+        }
+        
+        .passed-word { color: #222; }
+
+        /* 底部控制台 - 适配手机触摸 */
+        #controls {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 70px;
+            background: rgba(20, 20, 20, 0.95);
+            display: flex; justify-content: space-around; align-items: center;
+            z-index: 999; border-top: 1px solid #333;
+        }
+
+        button, select {
+            background: #222; color: #ccc; border: 1px solid #444;
+            padding: 8px 10px; font-size: 14px; border-radius: 6px;
+            font-weight: bold; outline: none;
+        }
+        /* 手机上按钮按下去的效果 */
+        button:active, select:active { background: #444; color: #fff; }
+        
+        .btn-main { background: #0078d7; border-color: #0078d7; color: #fff; padding: 8px 20px; }
+        .btn-stop { background: #d9534f; border-color: #d9534f; color: #fff; padding: 8px 20px; }
+        .btn-wait { background: #FFA500; border-color: #FFA500; color: #000; padding: 8px 20px;}
+        .btn-edit { border: 1px solid #00E5FF; color: #00E5FF; }
+
+        #speed-meter {
+            position: fixed; top: 50px; right: 20px;
+            color: rgba(255,255,255,0.3); font-family: monospace; font-size: 12px; pointer-events: none;
+        }
+
+        /* ★★★ 全屏编辑器 (适配手机) ★★★ */
+        #editor-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 10000;
+            flex-direction: column;
+        }
+        .editor-header {
+            height: 50px; background: #111; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; border-bottom: 1px solid #333;
+        }
+        #editor-text {
+            flex: 1; width: 100%; background: #111; color: #fff;
+            border: none; padding: 15px; font-size: 18px; line-height: 1.5;
+            font-family: sans-serif; resize: none; outline: none;
+            box-sizing: border-box;
+        }
+        /* 手机输入法弹起优化 */
+        #editor-text:focus { background: #000; }
+    </style>
+</head>
+<body>
+
+    <div id="status-bar">v84.0 安卓版 (建议使用 HTTPS)</div>
+    <div id="speed-meter">Flow: 0.0</div>
+
+    <div id="scroll-container">
+        <div id="content"></div>
+    </div>
+
+    <div id="controls">
+        <button id="btn-mic" class="btn-main" onclick="toggleApp()">🌊 启动</button>
+        
+        <select id="font-selector" onchange="changeFontFamily(this.value)">
+            <option value="'Microsoft YaHei', sans-serif">默认</option>
+            <option value="'SimHei', sans-serif">粗体</option>
+            <option value="'KaiTi', serif">楷体</option>
+            <option value="'SimSun', serif">宋体</option>
+        </select>
+
+        <button onclick="changeFontSize(5)">A+</button>
+        <button onclick="changeFontSize(-5)">A-</button>
+        <button onclick="toggleMirror()">镜像</button>
+        <button onclick="openEditor()" class="btn-edit">换稿</button>
+        <button onclick="reset()">重置</button>
+    </div>
+
+    <div id="editor-overlay">
+        <div class="editor-header">
+            <button class="btn-stop" onclick="closeEditor()" style="padding: 5px 15px;">取消</button>
+            <span style="color:#888; font-weight:bold;">编辑文稿</span>
+            <button class="btn-main" onclick="saveEditor()" style="padding: 5px 15px;">完成</button>
+        </div>
+        <textarea id="editor-text" placeholder="在此粘贴您的文稿..."></textarea>
+    </div>
+
+    <script>
+        var rawText = `这是v84安卓适配版。
+针对安卓手机麦克风问题说明：
+安卓Chrome为了安全，
+禁止本地文件(file://)调用麦克风。
+即使您给了浏览器权限也不行。
+必须将此网页放在服务器上，
+并使用 HTTPS 协议访问。
+或者在电脑开启局域网服务，
+手机通过 http://192.168... 访问。
+除此之外，
+此版本内核完全复刻v69。
+并未修改任何物理参数。
+请尝试点击启动。`;
+
+        var words = [];
+        var currIdx = 0;
+        var recognition = null;
+        var isRunning = false;
+        
+        // ★★★ v69 核心参数 (严格保持) ★★★
+        var currentSpeed = 0;    
+        var minSpeed = 0.5;      
+        var cruiseSpeed = 1.5;   
+        var container = document.getElementById('scroll-container');
+        var rafId = null;
+
+        function init() { 
+            render(); 
+            checkProtocol(); // 检测是否在手机本地运行
+        }
+
+        // 检测协议
+        function checkProtocol() {
+            var protocol = window.location.protocol;
+            if (protocol === 'file:' && /Android/i.test(navigator.userAgent)) {
+                alert("⚠️ 安卓系统警告：\n\n您正在直接打开 HTML 文件。\n安卓 Chrome 禁止此类文件使用麦克风。\n\n请将此文件部署到 Web 服务器(HTTPS)，或使用电脑开启服务器供手机访问。");
+            }
+        }
+
+        function render() {
+            var html = "";
+            var idx = 0;
+            for (let char of rawText) {
+                if (char === '\n') html += '<br>';
+                else if (char.trim() !== '') {
+                    html += `<span class="word" id="w-${idx}">${char}</span>`;
+                    idx++;
+                }
+            }
+            document.getElementById('content').innerHTML = html;
+            words = document.querySelectorAll('.word');
+            currIdx = 0;
+        }
+
+        // --- 编辑器逻辑 ---
+        function openEditor() {
+            document.getElementById('editor-text').value = rawText;
+            document.getElementById('editor-overlay').style.display = 'flex';
+        }
+
+        function closeEditor() {
+            document.getElementById('editor-overlay').style.display = 'none';
+        }
+
+        function saveEditor() {
+            var val = document.getElementById('editor-text').value;
+            if (val && val.trim().length > 0) {
+                rawText = val;
+                render();
+                reset();
+                closeEditor();
+            }
+        }
+
+        // --- 逻辑控制 (v69) ---
+        function toggleApp() {
+            if (isRunning) stopApp();
+            else prepareApp();
+        }
+
+        function prepareApp() {
+            document.getElementById('btn-mic').innerText = "⏳ 允许...";
+            document.getElementById('btn-mic').className = "btn-wait";
+            document.getElementById('status-bar').innerText = "⚠️ 请点击浏览器的“允许”按钮...";
+            document.getElementById('status-bar').className = "status-wait";
+            startRecognition(); 
+        }
+
+        function startFlowing() {
+            if (isRunning) return; 
+            isRunning = true;
+            document.getElementById('btn-mic').innerText = "🛑 停止";
+            document.getElementById('btn-mic').className = "btn-stop";
+            document.getElementById('status-bar').innerText = "🟢 正在听... (v69内核)";
+            document.getElementById('status-bar').className = "status-running";
+            
+            currentSpeed = minSpeed;
+            startFlowEngine(); 
+        }
+
+        function stopApp() {
+            isRunning = false;
+            if(recognition) recognition.stop();
+            cancelAnimationFrame(rafId);
+            document.getElementById('btn-mic').innerText = "🌊 启动";
+            document.getElementById('btn-mic').className = "btn-main";
+            document.getElementById('status-bar').innerText = "已停止";
+            document.getElementById('status-bar').className = "";
+            currentSpeed = 0; 
+        }
+
+        function startRecognition() {
+            // 兼容前缀
+            var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) { alert("您的浏览器不支持语音识别"); return; }
+
+            recognition = new SpeechRecognition();
+            recognition.lang = 'zh-CN';
+            recognition.continuous = true;
+            recognition.interimResults = true; 
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = function() { startFlowing(); };
+
+            recognition.onerror = function(event) {
+                if (event.error === 'not-allowed') {
+                    document.getElementById('status-bar').innerText = "❌ 麦克风被拒绝 (请检查HTTPS)";
+                    document.getElementById('status-bar').className = "status-error";
+                    document.getElementById('btn-mic').innerText = "🌊 启动";
+                    document.getElementById('btn-mic').className = "btn-main";
+                    alert("麦克风权限被拒绝！\n\n如果这是安卓手机，请确保您是通过 HTTPS 网址访问的，而不是直接打开的文件。");
+                } else {
+                     document.getElementById('status-bar').innerText = "❌ 错误: " + event.error;
+                }
+            };
+
+            recognition.onresult = function(event) {
+                var transcript = "";
+                for (var i = event.resultIndex; i < event.results.length; ++i) {
+                    transcript += event.results[i][0].transcript;
+                }
+                smartMatch(transcript);
+            };
+
+            recognition.onend = function() {
+                if (isRunning) try { recognition.start(); } catch(e){}
+            };
+
+            try { recognition.start(); } catch(e){}
+        }
+
+        // --- 流速引擎 (v69 原版) ---
+        function startFlowEngine() {
+            function loop() {
+                if (!isRunning) return;
+
+                var activeEl = words[currIdx];
+                var targetSpeed = 0;
+
+                if (activeEl) {
+                    var relativeY = activeEl.getBoundingClientRect().top;
+                    // 注意：手机上有状态栏，viewport高度要动态获取
+                    var viewportH = window.innerHeight;
+                    // v84修正：顶部有40px状态栏，计算比例时要减去偏差，但核心逻辑维持 v69
+                    var ratio = relativeY / viewportH;
+
+                    // v69 原始动态平衡逻辑
+                    if (ratio > 0.50) { 
+                        targetSpeed = cruiseSpeed + ((ratio - 0.50) * 15); 
+                        if(targetSpeed > 15) targetSpeed = 15;
+                    } 
+                    else if (ratio < 0.35) { 
+                        targetSpeed = minSpeed;
+                        if (ratio < 0.15) targetSpeed = 0; 
+                    } 
+                    else { 
+                        targetSpeed = cruiseSpeed;
+                    }
+                } else {
+                    targetSpeed = 0;
+                }
+
+                currentSpeed += (targetSpeed - currentSpeed) * 0.05;
+                
+                container.scrollTop += currentSpeed;
+                document.getElementById('speed-meter').innerText = "Flow: " + currentSpeed.toFixed(2);
+                rafId = requestAnimationFrame(loop);
+            }
+            loop();
+        }
+
+        // --- 智能防跳 (v69 原版) ---
+        function smartMatch(transcript) {
+            var clean = transcript.replace(/[^\u4e00-\u9fa50-9]/g, "");
+            if (clean.length < 1) return;
+
+            var foundOffset = -1;
+            
+            if (clean.length >= 2) {
+                var key2 = clean.slice(-2);
+                var searchWide = 50;
+                for (let offset = 0; offset < searchWide; offset++) {
+                    if (!words[currIdx + offset] || !words[currIdx + offset + 1]) break;
+                    var char1 = words[currIdx + offset].innerText;
+                    var char2 = words[currIdx + offset + 1].innerText;
+                    if ((char1 + char2) === key2) {
+                        foundOffset = offset + 1;
+                        break; 
+                    }
+                }
+            }
+
+            if (foundOffset === -1) {
+                var key1 = clean.slice(-1);
+                var searchNarrow = 8; 
+                for (let offset = 0; offset < searchNarrow; offset++) {
+                    if (!words[currIdx + offset]) break;
+                    if (words[currIdx + offset].innerText === key1) {
+                        foundOffset = offset;
+                        break; 
+                    }
+                }
+            }
+
+            if (foundOffset !== -1) {
+                var newIdx = currIdx + foundOffset;
+                for (let i = currIdx; i <= newIdx; i++) {
+                     if(words[i]) {
+                         words[i].className = (i < newIdx) ? "word passed-word" : "word active-word";
+                     }
+                }
+                currIdx = newIdx;
+            }
+        }
+
+        // --- UI 功能 ---
+        function changeFontSize(d) {
+            var el = document.getElementById('content');
+            var s = parseInt(window.getComputedStyle(el).fontSize);
+            el.style.fontSize = (s + d) + "px";
+        }
+        
+        function changeFontFamily(font) {
+            document.getElementById('content').style.fontFamily = font;
+        }
+
+        function toggleMirror() { document.getElementById('content').classList.toggle("mirror-on"); }
+        
+        function reset() { 
+            currIdx = 0; 
+            render(); 
+            container.scrollTop = 0; 
+            if(isRunning) currentSpeed = minSpeed;
+        }
+
+        init();
+    </script>
+</body>
+</html>
