@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>v88.0 横屏沉浸版</title>
+    <title>v89.0 自动全屏沉浸版</title>
     <style>
         body {
             background-color: #000;
@@ -14,40 +14,42 @@
             user-select: none;
         }
 
-        /* 顶部状态栏 (横屏会自动隐藏) */
+        /* 顶部状态栏 */
         #status-bar {
             position: fixed; top: 0; left: 0; width: 100%; height: 30px;
             background: #111; border-bottom: 1px solid #333;
             display: flex; align-items: center; justify-content: center;
             font-size: 12px; color: #888; z-index: 100;
+            transition: opacity 0.5s;
         }
         
         /* 滚动容器 */
         #scroll-container {
             position: absolute; top: 30px; left: 0; width: 100%; 
-            height: calc(100% - 130px); /* 默认竖屏高度 */
+            height: calc(100% - 130px); 
             overflow-y: scroll;
             scroll-behavior: auto; 
+            transition: all 0.5s;
         }
         #scroll-container::-webkit-scrollbar { display: none; }
 
         #content {
             padding: 40vh 5% 800px 5%;
             width: 90%;
-            font-size: 55px; 
+            font-size: 50px; 
             line-height: 1.6; 
             text-align: center;
         }
         
         .mirror-on { transform: scaleX(-1); }
 
-        /* 底部控制区 (默认竖屏样式) */
+        /* 底部控制区 */
         #bottom-panel {
             position: fixed; bottom: 0; left: 0; width: 100%; height: 100px;
             background: #1a1a1a; border-top: 1px solid #333;
             display: flex; flex-direction: column; justify-content: space-evenly;
             z-index: 999; padding: 5px 15px; box-sizing: border-box;
-            transition: all 0.3s;
+            transition: all 0.5s;
         }
 
         .slider-row {
@@ -66,10 +68,10 @@
         }
         .running #btn-start { background: #d9534f; }
 
-        /* 音量条可视化 */
+        /* 音量条 */
         #vol-meter {
             position: absolute; bottom: 100px; left: 0; width: 100%; height: 4px;
-            background: #333; transition: bottom 0.3s;
+            background: #333; transition: bottom 0.5s, opacity 0.5s;
         }
         #vol-bar {
             width: 0%; height: 100%; background: #00E5FF;
@@ -80,48 +82,50 @@
         #side-controls {
             position: fixed; bottom: 110px; right: 10px;
             display: flex; flex-direction: column; gap: 8px; z-index: 998;
-            transition: opacity 0.3s;
+            transition: opacity 0.5s;
         }
         .mini-btn {
-            width: 40px; height: 40px; border-radius: 50%;
+            width: 36px; height: 36px; border-radius: 50%;
             background: rgba(50,50,50,0.8); border: 1px solid #666;
-            color: #fff; font-size: 12px; font-weight: bold;
+            color: #fff; font-size: 10px; font-weight: bold;
             display: flex; align-items: center; justify-content: center;
         }
 
-        /* ★★★ 横屏适配核心代码 (CSS Media Query) ★★★ */
+        /* ★★★ 横屏沉浸模式 (核心修改) ★★★ */
         @media (orientation: landscape) {
-            /* 1. 隐藏顶部状态栏，节省空间 */
-            #status-bar { display: none; }
+            /* 1. 隐藏多余元素 */
+            #status-bar { display: none !important; }
+            #side-controls { display: none !important; } /* 彻底隐藏侧边按钮，防止遮挡 */
             
-            /* 2. 调整滚动区域，占满屏幕大部分 */
+            /* 2. 扩大显示区域 */
             #scroll-container { 
                 top: 0; 
-                height: calc(100% - 50px); /* 底部留50px给控制条 */
+                height: 100%; /* 全屏显示 */
             }
             #content {
-                font-size: 70px; /* 横屏字号变大 */
-                padding: 10vh 10% 500px 10%; /* 减少顶部留白 */
+                font-size: 70px; /* 大字号 */
+                padding: 10vh 5% 500px 5%;
             }
 
-            /* 3. 底部控制条变薄，横向排列 */
+            /* 3. 底部控制栏：平时半透明，防遮挡，只有音量条可见 */
             #bottom-panel {
                 height: 50px;
-                flex-direction: row; /* 变成一行 */
+                flex-direction: row;
                 align-items: center;
                 gap: 15px;
+                opacity: 0.1; /* 默认几乎透明 */
+                background: rgba(0,0,0,0.8);
+                border: none;
             }
+            /* 触摸底部时显示控制栏 */
+            #bottom-panel:active, #bottom-panel:hover { opacity: 1; }
             
-            /* 4. 调整滑块样式以适应横排 */
-            .slider-row { width: 35%; }
-            #btn-start { width: 20%; height: 35px; margin-top: 0; }
+            /* 启动按钮样式调整 */
+            #btn-start { width: 80px; height: 35px; margin: 0; }
+            .slider-row { width: 30%; }
             
-            /* 5. 调整音量条位置 */
-            #vol-meter { bottom: 50px; }
-
-            /* 6. 横屏时隐藏侧边按钮 (或者可以设为半透明) 以防遮挡 */
-            /* 如果您想保留，可以注释掉下面这行 */
-            #side-controls { opacity: 0.3; } 
+            /* 音量条贴底 */
+            #vol-meter { bottom: 0; height: 3px; z-index: 1000; opacity: 0.5; pointer-events: none;}
         }
 
         /* 编辑器 */
@@ -139,7 +143,7 @@
 </head>
 <body>
 
-    <div id="status-bar">v88.0 横屏沉浸版 (请旋转手机)</div>
+    <div id="status-bar">v89.0 自动全屏沉浸版 (请在竖屏调好参数)</div>
     
     <div id="vol-meter"><div id="vol-bar"></div></div>
 
@@ -148,7 +152,7 @@
     </div>
 
     <div id="side-controls">
-        <button class="mini-btn" onclick="toggleFullscreen()">⛶</button> <button class="mini-btn" onclick="openEditor()">稿</button>
+        <button class="mini-btn" onclick="openEditor()">稿</button>
         <button class="mini-btn" onclick="toggleMirror()">镜</button>
         <button class="mini-btn" onclick="changeFontSize(5)">+</button>
         <button class="mini-btn" onclick="changeFontSize(-5)">-</button>
@@ -179,22 +183,23 @@
     </div>
 
     <script>
-        var rawText = `这是v88横屏沉浸版。
-支持手机旋转自动适配。
-使用技巧：
-1. 竖屏时：
-   适合单手操作和设置参数。
-   可以先调好灵敏度和速度。
-2. 横屏时：
-   界面会自动变身。
-   顶部栏隐藏，底部栏变薄。
-   字号自动变大。
-   获得最大阅读视野。
-3. 沉浸模式：
-   点击右侧第一个【⛶】按钮。
-   可以隐藏浏览器地址栏，
-   让屏幕完全变成提词器。
-祝您录制顺利！`;
+        var rawText = `这是v89自动全屏版。
+核心逻辑升级：
+1. 竖屏模式：
+   您可以在此时调整字号、镜像、
+   和编辑文稿。侧边栏都在。
+2. 横屏 + 启动：
+   当您把手机横过来，
+   并点击底部的【启动声控】时，
+   系统会强制进入“全屏模式”。
+   - 侧边栏会自动消失。
+   - 顶部状态栏消失。
+   - 底部控制栏变透明。
+   - 浏览器地址栏消失。
+   整个屏幕只剩下文字。
+3. 如何停止：
+   点击屏幕底部区域，
+   唤出控制栏，点击停止即可。`;
 
         var isRunning = false;
         var audioContext = null;
@@ -218,6 +223,9 @@
         }
 
         async function startAudio() {
+            // ★★★ 核心修改：点击启动时，触发全屏 ★★★
+            enterFullscreen();
+
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -253,13 +261,12 @@
                 };
 
                 isRunning = true;
-                // 横屏时按钮文字会自动缩短，防止撑破布局
                 document.getElementById('btn-start').innerText = "停止";
                 document.getElementById('bottom-panel').classList.add('running');
                 enableNoSleep();
 
             } catch (e) {
-                alert("无法启动麦克风 (请检查HTTPS权限): " + e);
+                alert("无法启动 (检查HTTPS/麦克风权限): " + e);
             }
         }
 
@@ -271,6 +278,21 @@
             document.getElementById('btn-start').innerText = "启动声控";
             document.getElementById('bottom-panel').classList.remove('running');
             document.getElementById('vol-bar').style.width = "0%";
+            
+            // 停止时，可以选择是否退出全屏，这里建议保持全屏，避免跳动
+            // exitFullscreen(); 
+        }
+
+        // ★★★ 自动全屏逻辑 ★★★
+        function enterFullscreen() {
+            var elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen().catch(err => { console.log("全屏被拦截，可能需要手动点击"); });
+            } else if (elem.webkitRequestFullscreen) { /* Safari */
+                elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) { /* IE11 */
+                elem.msRequestFullscreen();
+            }
         }
 
         function enableNoSleep() {
@@ -303,19 +325,6 @@
             if (val) { rawText = val; render(); closeEditor(); } 
         }
         function reset() { container.scrollTop = 0; }
-        
-        // ★★★ 全屏功能 ★★★
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
-                });
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
-            }
-        }
 
         init();
     </script>
